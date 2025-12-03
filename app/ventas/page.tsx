@@ -29,6 +29,8 @@ export default function VentasPage() {
   const [search, setSearch] = useState("")
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [showSearch, setShowSearch] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [mounted, setMounted] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -73,20 +75,34 @@ export default function VentasPage() {
         setShowSearch(true)
         setTimeout(() => searchInputRef.current?.focus(), 100)
       }
-      // F5 - Confirm sale
-      if (e.key === "F5" && cart.length > 0) {
+      // F4 - Confirm sale (show confirmation modal)
+      if (e.key === "F4" && cart.length > 0) {
         e.preventDefault()
-        handleConfirmSale()
+        setShowConfirmModal(true)
       }
-      // F8 - Cancel sale
+      // F8 - Cancel sale (show confirmation modal)
       if (e.key === "F8" && cart.length > 0) {
         e.preventDefault()
-        handleCancelSale()
+        setShowCancelModal(true)
       }
-      // Escape - Close search
+      // Escape - Close search or modals
       if (e.key === "Escape") {
         setShowSearch(false)
+        setShowConfirmModal(false)
+        setShowCancelModal(false)
         setSearch("")
+      }
+      // Enter - Confirm action in modals
+      if (e.key === "Enter") {
+        if (showConfirmModal) {
+          e.preventDefault()
+          handleConfirmSale()
+          setShowConfirmModal(false)
+        } else if (showCancelModal) {
+          e.preventDefault()
+          handleCancelSale()
+          setShowCancelModal(false)
+        }
       }
       // Arrow navigation in search
       if (showSearch && searchResults.length > 0) {
@@ -104,7 +120,7 @@ export default function VentasPage() {
         }
       }
     },
-    [showSearch, searchResults, selectedIndex, cart],
+    [showSearch, searchResults, selectedIndex, cart, showConfirmModal, showCancelModal],
   )
 
   useEffect(() => {
@@ -219,7 +235,7 @@ export default function VentasPage() {
               <span className="text-xs mr-1">F3</span> Buscar
             </Badge>
             <Badge variant="outline" className="px-3 py-1">
-              <span className="text-xs mr-1">F5</span> Confirmar
+              <span className="text-xs mr-1">F4</span> Confirmar
             </Badge>
             <Badge variant="outline" className="px-3 py-1">
               <span className="text-xs mr-1">F8</span> Cancelar
@@ -322,11 +338,11 @@ export default function VentasPage() {
             </CardContent>
           </Card>
 
-          <Button className="w-full h-14 text-lg gap-2" disabled={cart.length === 0} onClick={handleConfirmSale}>
+          <Button className="w-full h-14 text-lg gap-2" disabled={cart.length === 0} onClick={() => setShowConfirmModal(true)}>
             <FiCheck className="h-5 w-5" />
             Confirmar Venta
             <Badge variant="secondary" className="ml-2">
-              F5
+              F4
             </Badge>
           </Button>
 
@@ -334,7 +350,7 @@ export default function VentasPage() {
             variant="outline"
             className="w-full h-12 gap-2 bg-transparent"
             disabled={cart.length === 0}
-            onClick={handleCancelSale}
+            onClick={() => setShowCancelModal(true)}
           >
             <FiX className="h-5 w-5" />
             Cancelar
@@ -442,6 +458,123 @@ export default function VentasPage() {
                 <span>↑↓ Navegar</span>
                 <span>Enter Agregar</span>
                 <span>Esc Cerrar</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Sale Modal */}
+      <AnimatePresence>
+        {showConfirmModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={() => setShowConfirmModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card rounded-xl w-full max-w-md shadow-2xl overflow-hidden border"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <FiCheck className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Confirmar Venta</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Total: ${total.toLocaleString("es-AR")}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-muted-foreground mb-6">
+                  ¿Confirmar la venta de {cart.length} producto(s)?
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowConfirmModal(false)}
+                  >
+                    Cancelar
+                    <Badge variant="secondary" className="ml-2">Esc</Badge>
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      handleConfirmSale()
+                      setShowConfirmModal(false)
+                    }}
+                  >
+                    Confirmar
+                    <Badge variant="secondary" className="ml-2">Enter</Badge>
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Cancel Sale Modal */}
+      <AnimatePresence>
+        {showCancelModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={() => setShowCancelModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card rounded-xl w-full max-w-md shadow-2xl overflow-hidden border"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <FiX className="h-6 w-6 text-destructive" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Cancelar Venta</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {cart.length} producto(s) en el carrito
+                    </p>
+                  </div>
+                </div>
+                <p className="text-muted-foreground mb-6">
+                  ¿Estás seguro de que deseas cancelar esta venta?
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowCancelModal(false)}
+                  >
+                    No
+                    <Badge variant="secondary" className="ml-2">Esc</Badge>
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={() => {
+                      handleCancelSale()
+                      setShowCancelModal(false)
+                    }}
+                  >
+                    Sí, cancelar
+                    <Badge variant="secondary" className="ml-2">Enter</Badge>
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
