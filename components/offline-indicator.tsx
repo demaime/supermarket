@@ -51,11 +51,8 @@ export function OfflineIndicator() {
 
     setIsSyncing(true)
 
-    // Simulate sync - in production this would call your API
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    const unsynced = store.getUnsyncedSales()
-    store.markSalesAsSynced(unsynced.map((s) => s.id))
+    // Sincronizamos realmente contra la API usando la lógica del store
+    await store.syncUnsyncedSales()
 
     updatePendingSales()
     setIsSyncing(false)

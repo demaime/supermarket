@@ -10,14 +10,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { FiArrowLeft, FiSearch, FiShoppingCart, FiCalendar, FiUser, FiChevronDown, FiChevronUp } from "react-icons/fi"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Loader } from "@/components/ui/loader"
 
 export default function RegistrosPage() {
   const [user, setUser] = useState<User | null>(null)
   const [sales, setSales] = useState<Sale[]>([])
   const [filteredSales, setFilteredSales] = useState<Sale[]>([])
   const [search, setSearch] = useState("")
+  const [searchType, setSearchType] = useState<"all" | "id" | "seller" | "amount" | "product">("all")
   const [expandedSale, setExpandedSale] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
@@ -30,18 +34,18 @@ export default function RegistrosPage() {
     setUser(currentUser)
     
     // Initial load
-    const loadSales = () => {
-      const allSales = store.getSales()
-      setSales(allSales)
-      setFilteredSales(allSales)
+    const loadSales = async () => {
+      setIsLoading(true)
+      try {
+        const allSales = await store.loadSalesFromDb()
+        setSales(allSales)
+        setFilteredSales(allSales)
+      } finally {
+        setIsLoading(false)
+      }
     }
     
     loadSales()
-    
-    // Try to sync if online
-    if (navigator.onLine) {
-      store.syncWithDb().then(() => loadSales())
-    }
   }, [router])
 
   useEffect(() => {
@@ -50,15 +54,33 @@ export default function RegistrosPage() {
     } else {
       const lowerSearch = search.toLowerCase()
       setFilteredSales(
-        sales.filter(
-          (sale) =>
-            sale.id.toLowerCase().includes(lowerSearch) ||
-            sale.userName.toLowerCase().includes(lowerSearch) ||
-            sale.total.toString().includes(lowerSearch)
-        )
+        sales.filter((sale) => {
+          switch (searchType) {
+            case "id":
+              return sale.id.toLowerCase().includes(lowerSearch)
+            case "seller":
+              return sale.userName.toLowerCase().includes(lowerSearch)
+            case "amount":
+              return sale.total.toString().includes(lowerSearch)
+            case "product":
+              return sale.items.some(item => 
+                item.productName.toLowerCase().includes(lowerSearch)
+              )
+            case "all":
+            default:
+              return (
+                sale.id.toLowerCase().includes(lowerSearch) ||
+                sale.userName.toLowerCase().includes(lowerSearch) ||
+                sale.total.toString().includes(lowerSearch) ||
+                sale.items.some(item => 
+                  item.productName.toLowerCase().includes(lowerSearch)
+                )
+              )
+          }
+        })
       )
     }
-  }, [search, sales])
+  }, [search, searchType, sales])
 
   if (!mounted || !user) return null
 
@@ -93,20 +115,37 @@ export default function RegistrosPage() {
             </div>
           </div>
           
-          <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por ID, vendedor o monto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex gap-3">
+            <Select value={searchType} onValueChange={(v) => setSearchType(v as typeof searchType)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Buscar por..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo</SelectItem>
+                <SelectItem value="id">ID</SelectItem>
+                <SelectItem value="seller">Vendedor</SelectItem>
+                <SelectItem value="amount">Monto</SelectItem>
+                <SelectItem value="product">Producto</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <div className="relative flex-1">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={`Buscar por ${searchType === "all" ? "ID, vendedor, monto o producto" : searchType === "id" ? "ID" : searchType === "seller" ? "vendedor" : searchType === "amount" ? "monto" : "producto"}...`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto p-4 md:p-6">
-        {filteredSales.length === 0 ? (
+        {isLoading ? (
+          <Loader />
+        ) : filteredSales.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <FiShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>No se encontraron ventas</p>

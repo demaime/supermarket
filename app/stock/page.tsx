@@ -14,6 +14,9 @@ import { QuickStockModal } from "@/components/quick-stock-modal"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog"
+
+import { Loader } from "@/components/ui/loader"
 
 export default function StockPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -25,7 +28,10 @@ export default function StockPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [quickStockProduct, setQuickStockProduct] = useState<Product | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const { confirm, Dialog: ConfirmDialog } = useConfirmDialog()
 
   useEffect(() => {
     setMounted(true)
@@ -54,7 +60,7 @@ export default function StockPage() {
 
     // Apply filter
     if (filter === "low") {
-      result = result.filter((p) => p.quantity < 10)
+      result = result.filter((p) => p.quantity <= (p.lowStockThreshold || 10))
     } else if (filter === "juan") {
       result = result.filter((p) => p.beneficiary === "juan")
     } else if (filter === "lucas") {
@@ -65,8 +71,13 @@ export default function StockPage() {
   }, [products, search, filter])
 
   const loadProducts = async () => {
-    const products = await store.loadProductsFromDb()
-    setProducts(products)
+    setIsLoading(true)
+    try {
+      const products = await store.loadProductsFromDb()
+      setProducts(products)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleAddProduct = () => {
@@ -79,20 +90,36 @@ export default function StockPage() {
     setIsModalOpen(true)
   }
 
-  const handleDeleteProduct = (product: Product) => {
-    if (confirm(`¿Estás seguro de eliminar "${product.name}"?`)) {
+  const handleDeleteProduct = async (product: Product) => {
+    const confirmed = await confirm({
+      title: "Eliminar Producto",
+      description: `¿Estás seguro de eliminar "${product.name}"? Esta acción no se puede deshacer.`,
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      type: "danger",
+    })
+
+    if (confirmed) {
       store.deleteProduct(product.id)
       loadProducts()
       toast.success("Producto eliminado")
     }
   }
 
-  const handleSaveProduct = (product: Product) => {
+  const handleSaveProduct = async (product: Product) => {
     if (user) {
-      store.saveProduct(product, user.id, user.name)
-      loadProducts()
-      setIsModalOpen(false)
-      toast.success(selectedProduct ? "Producto actualizado" : "Producto agregado")
+      setIsSaving(true)
+      try {
+        await store.saveProduct(product, user.id, user.name)
+        await loadProducts()
+        setIsModalOpen(false)
+        toast.success(selectedProduct ? "Producto actualizado" : "Producto agregado")
+      } catch (error) {
+        toast.error("Error al guardar el producto")
+        console.error("Error saving product:", error)
+      } finally {
+        setIsSaving(false)
+      }
     }
   }
 
@@ -100,16 +127,21 @@ export default function StockPage() {
     setQuickStockProduct(product)
   }
 
-  const handleSaveQuickStock = (product: Product, quantityChange: number) => {
+  const handleSaveQuickStock = async (product: Product, quantityChange: number) => {
     if (user) {
-      store.saveProduct(product, user.id, user.name)
-      loadProducts()
-      setQuickStockProduct(null)
-      toast.success(`Stock ${quantityChange > 0 ? "agregado" : "reducido"}: ${Math.abs(quantityChange)} unidades`)
+      try {
+        await store.saveProduct(product, user.id, user.name)
+        await loadProducts()
+        setQuickStockProduct(null)
+        toast.success(`Stock ${quantityChange > 0 ? "agregado" : "reducido"}: ${Math.abs(quantityChange)} unidades`)
+      } catch (error) {
+        toast.error("Error al actualizar el stock")
+        console.error("Error updating stock:", error)
+      }
     }
   }
 
-  const lowStockCount = products.filter((p) => p.quantity < 10).length
+  const lowStockCount = products.filter((p) => p.quantity <= (p.lowStockThreshold || 10)).length
 
   if (!mounted || !user) return null
 
@@ -135,64 +167,75 @@ export default function StockPage() {
       </header>
 
       <main className="max-w-6xl mx-auto p-4 md:p-6">
-        {/* Stats Cards */}
+        {isLoading ? (
+          <Loader />
+        ) : (
+          <>
+            {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4">
+          {/* Total */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 shadow-md hover:shadow-lg transition-shadow">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
+            <div className="relative p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FiPackage className="h-5 w-5 text-primary" />
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/80 via-primary to-primary/90 flex items-center justify-center shadow-md shadow-primary/20">
+                  <FiPackage className="h-5 w-5 text-white drop-shadow-sm" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-xl font-bold">{products.length}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total</p>
+                  <p className="text-2xl font-bold text-foreground">{products.length}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-          <Card className={lowStockCount > 0 ? "border-destructive/50" : ""}>
-            <CardContent className="p-4">
+            </div>
+          </div>
+
+          {/* Stock Bajo */}
+          <div className={`relative overflow-hidden rounded-xl border shadow-md hover:shadow-lg transition-shadow ${lowStockCount > 0 ? "bg-gradient-to-br from-destructive/10 via-destructive/5 to-background border-destructive/30" : "bg-gradient-to-br from-muted/50 to-background border-border"}`}>
+            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
+            <div className="relative p-4">
               <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${lowStockCount > 0 ? "bg-destructive/10" : "bg-muted"}`}
-                >
-                  <FiAlertTriangle
-                    className={`h-5 w-5 ${lowStockCount > 0 ? "text-destructive" : "text-muted-foreground"}`}
-                  />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-md ${lowStockCount > 0 ? "bg-gradient-to-br from-destructive/80 to-destructive shadow-destructive/20" : "bg-muted"}`}>
+                  <FiAlertTriangle className={`h-5 w-5 ${lowStockCount > 0 ? "text-white drop-shadow-sm" : "text-muted-foreground"}`} />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Stock bajo</p>
-                  <p className="text-xl font-bold">{lowStockCount}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stock bajo</p>
+                  <p className="text-2xl font-bold text-foreground">{lowStockCount}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
+            </div>
+          </div>
+
+          {/* Juan */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 shadow-md hover:shadow-lg transition-shadow">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
+            <div className="relative p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-chart-2/20 flex items-center justify-center">
-                  <span className="text-chart-2 font-bold">J</span>
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/80 via-primary to-primary/90 flex items-center justify-center shadow-md shadow-primary/20">
+                  <span className="text-white font-bold drop-shadow-sm">J</span>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Juan</p>
-                  <p className="text-xl font-bold">{products.filter((p) => p.beneficiary === "juan").length}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Juan</p>
+                  <p className="text-2xl font-bold text-foreground">{products.filter((p) => p.beneficiary === "juan").length}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
+            </div>
+          </div>
+
+          {/* Lucas */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 shadow-md hover:shadow-lg transition-shadow">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
+            <div className="relative p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-chart-4/20 flex items-center justify-center">
-                  <span className="text-chart-4 font-bold">L</span>
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/80 via-primary to-primary/90 flex items-center justify-center shadow-md shadow-primary/20">
+                  <span className="text-white font-bold drop-shadow-sm">L</span>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Lucas</p>
-                  <p className="text-xl font-bold">{products.filter((p) => p.beneficiary === "lucas").length}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lucas</p>
+                  <p className="text-2xl font-bold text-foreground">{products.filter((p) => p.beneficiary === "lucas").length}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
         {/* Search and Filter */}
@@ -240,7 +283,7 @@ export default function StockPage() {
                           <Badge variant="outline" className="text-xs">
                             {product.brand}
                           </Badge>
-                          {product.quantity < 10 && (
+                          {product.quantity <= (product.lowStockThreshold || 10) && (
                             <Badge variant="destructive" className="text-xs">
                               Stock bajo
                             </Badge>
@@ -272,7 +315,9 @@ export default function StockPage() {
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-center">
-                          <p className={`text-3xl font-bold ${product.quantity < 10 ? "text-destructive" : ""}`}>
+                          <p
+                            className={`text-3xl font-bold ${product.quantity <= (product.lowStockThreshold || 10) ? "text-destructive" : ""}`}
+                          >
                             {product.quantity}
                           </p>
                           <p className="text-xs text-muted-foreground">unidades</p>
@@ -281,19 +326,24 @@ export default function StockPage() {
                           <Button
                             variant="outline"
                             size="icon"
-                            className="bg-primary/10 hover:bg-primary hover:text-primary-foreground text-primary"
+                            className="bg-popover dark:bg-secondary hover:bg-primary dark:hover:bg-primary hover:text-white dark:hover:text-foreground text-primary border-primary/30 shadow-sm transition-all"
                             onClick={() => handleQuickStock(product)}
                             title="Agregar/Quitar Stock"
                           >
                             <FiPackage className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="icon" onClick={() => handleEditProduct(product)}>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="bg-popover dark:bg-secondary hover:bg-foreground dark:hover:bg-foreground hover:text-background dark:hover:text-background border-border shadow-sm transition-all"
+                            onClick={() => handleEditProduct(product)}
+                          >
                             <FiEdit2 className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"
                             size="icon"
-                            className="text-destructive hover:bg-destructive hover:text-destructive-foreground bg-transparent"
+                            className="bg-popover dark:bg-secondary text-destructive hover:bg-destructive dark:hover:bg-destructive hover:text-white dark:hover:text-foreground border-destructive/30 shadow-sm transition-all"
                             onClick={() => handleDeleteProduct(product)}
                           >
                             <FiTrash2 className="h-4 w-4" />
@@ -314,12 +364,19 @@ export default function StockPage() {
             </div>
           )}
         </div>
+          </>
+        )}
       </main>
 
       {/* Product Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <ProductModal product={selectedProduct} onClose={() => setIsModalOpen(false)} onSave={handleSaveProduct} />
+          <ProductModal
+            product={selectedProduct}
+            onClose={() => setIsModalOpen(false)}
+            onSave={handleSaveProduct}
+            isSaving={isSaving}
+          />
         )}
       </AnimatePresence>
 
@@ -333,6 +390,9 @@ export default function StockPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog />
     </div>
   )
 }

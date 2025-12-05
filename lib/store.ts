@@ -136,6 +136,9 @@ class Store {
     if (!isBrowser() || !navigator.onLine) return
 
     try {
+      // Primero intentamos sincronizar ventas pendientes hacia la DB
+      await this.syncUnsyncedSales()
+
       // Products
       const productsRes = await fetch("/api/products")
       if (productsRes.ok) {
@@ -171,12 +174,12 @@ class Store {
   private async _syncItem(endpoint: string, data: any, method = "POST") {
     if (!isBrowser() || !navigator.onLine) return false
     try {
-      await fetch(endpoint, {
+      const response = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       })
-      return true
+      return response.ok
     } catch {
       return false
     }
@@ -217,15 +220,17 @@ class Store {
       const res = await fetch("/api/products")
       if (res.ok) {
         const products = await res.json()
-        if (products.length > 0) {
-          this.setItem("products", products)
-          return products
-        }
+        // SIEMPRE actualizar localStorage, incluso si está vacío
+        this.setItem("products", products)
+        return products
       }
     } catch (error) {
       console.error("Failed to load products from DB:", error)
+      // Si falla el fetch, usar cache como fallback
+      return this.getProducts()
     }
 
+    // Si response no es ok, usar cache
     return this.getProducts()
   }
 
@@ -233,93 +238,77 @@ class Store {
     return this.getProducts().find((p) => p.id === id)
   }
 
-  saveProduct(product: Product, userId: string, userName: string): void {
+  async loadSalesFromDb(): Promise<Sale[]> {
+    if (!isBrowser() || !navigator.onLine) {
+      return this.getSales()
+    }
+
+    try {
+      const res = await fetch("/api/ventas")
+      if (res.ok) {
+        const sales = await res.json()
+        this.setItem("sales", sales)
+        return sales
+      }
+    } catch (error) {
+      console.error("Failed to load sales from DB:", error)
+    }
+
+    return this.getSales()
+  }
+
+  async loadStockLogsFromDb(): Promise<StockLog[]> {
+    if (!isBrowser() || !navigator.onLine) {
+      return this.getStockLogs()
+    }
+
+    try {
+      const res = await fetch("/api/logs-stock")
+      if (res.ok) {
+        const logs = await res.json()
+        this.setItem("stockLogs", logs)
+        return logs
+      }
+    } catch (error) {
+      console.error("Failed to load stock logs from DB:", error)
+    }
+
+    return this.getStockLogs()
+  }
+
+  async saveProduct(product: Product, userId: string, userName: string): Promise<boolean> {
+    console.log('🟡 Store.saveProduct recibió:', product.name, 'lowStockThreshold:', product.lowStockThreshold)
+    
     const products = this.getProducts()
     const existingIndex = products.findIndex((p) => p.id === product.id)
 
     if (existingIndex >= 0) {
-      const old = products[existingIndex]
       products[existingIndex] = { ...product, updatedAt: new Date().toISOString() }
-
-      // Log changes
-      if (old.quantity !== product.quantity) {
-        this.addStockLog({
-          id: crypto.randomUUID(),
-          productId: product.id,
-          productName: product.name,
-          action: product.quantity > old.quantity ? "add" : "remove",
-          previousValue: old.quantity,
-          newValue: product.quantity,
-          userId,
-          userName,
-          createdAt: new Date().toISOString(),
-        })
-      }
-      if (old.price !== product.price) {
-        this.addStockLog({
-          id: crypto.randomUUID(),
-          productId: product.id,
-          productName: product.name,
-          action: "update_price",
-          previousValue: old.price,
-          newValue: product.price,
-          userId,
-          userName,
-          createdAt: new Date().toISOString(),
-        })
-      }
-      if (old.cost !== product.cost) {
-        this.addStockLog({
-          id: crypto.randomUUID(),
-          productId: product.id,
-          productName: product.name,
-          action: "update_cost",
-          previousValue: old.cost,
-          newValue: product.cost,
-          userId,
-          userName,
-          createdAt: new Date().toISOString(),
-        })
-      }
     } else {
       product.id = crypto.randomUUID()
       product.createdAt = new Date().toISOString()
       product.updatedAt = new Date().toISOString()
       products.push(product)
-
-      this.addStockLog({
-        id: crypto.randomUUID(),
-        productId: product.id,
-        productName: product.name,
-        action: "create",
-        previousValue: 0,
-        newValue: product.quantity,
-        userId,
-        userName,
-        createdAt: new Date().toISOString(),
-      })
     }
 
     this.setItem("products", products)
-    this._syncItem("/api/products", product)
+    
+    // Enviar al backend con userId y userName para que el backend cree los logs
+    const productWithUser = { ...product, userId, userName }
+    console.log('🟢 Store enviando al backend:', productWithUser.name, 'lowStockThreshold:', productWithUser.lowStockThreshold)
+    return await this._syncItem("/api/products", productWithUser)
   }
 
   deleteProduct(id: string): void {
-    const products = this.getProducts().filter((p) => p.id !== id)
-    this.setItem("products", products)
-    // Note: Delete API not implemented yet in this iteration
-  }
-
-  updateProductQuantity(productId: string, quantitySold: number): void {
     const products = this.getProducts()
-    const productIndex = products.findIndex((p) => p.id === productId)
-    if (productIndex >= 0) {
-      products[productIndex].quantity -= quantitySold
-      products[productIndex].updatedAt = new Date().toISOString()
-      this.setItem("products", products)
-      
-      // Sync the updated product
-      this._syncItem("/api/products", products[productIndex])
+    const filtered = products.filter((p) => p.id !== id)
+    this.setItem("products", filtered)
+
+    // Sincronizar eliminación con backend
+    if (isBrowser() && navigator.onLine) {
+      fetch(`/api/products?id=${id}`, { method: "DELETE" }).catch((err) =>
+        console.error("Failed to delete product from DB:", err),
+      )
     }
   }
 
@@ -328,28 +317,51 @@ class Store {
     return this.getItem<StockLog[]>("stockLogs", [])
   }
 
-  addStockLog(log: StockLog): void {
-    const logs = this.getStockLogs()
-    logs.unshift(log)
-    this.setItem("stockLogs", logs.slice(0, 500)) // Keep last 500 logs
-    this._syncItem("/api/logs-stock", log)
-  }
+  // NOTA: addStockLog fue eliminado.
+  // Los logs de auditoría SOLO deben ser creados por el backend (/api/products)
+  // para evitar duplicaciones.
 
   // Sales
   getSales(): Sale[] {
     return this.getItem<Sale[]>("sales", [])
   }
 
+  /**
+   * Sincroniza todas las ventas que estén marcadas como no sincronizadas
+   * (`synced === false`) hacia la API. La deduplicación final la hace
+   * el backend usando el `id` de la venta.
+   */
+  async syncUnsyncedSales(): Promise<void> {
+    if (!isBrowser() || !navigator.onLine) return
+
+    const unsynced = this.getUnsyncedSales()
+    if (unsynced.length === 0) return
+
+    const successfullySynced: string[] = []
+
+    for (const sale of unsynced) {
+      try {
+        const ok = await this._syncItem("/api/ventas", sale)
+        if (ok) {
+          successfullySynced.push(sale.id)
+        }
+      } catch (error) {
+        console.error("Error syncing sale", sale.id, error)
+      }
+    }
+
+    if (successfullySynced.length > 0) {
+      this.markSalesAsSynced(successfullySynced)
+    }
+  }
+
   addSale(sale: Sale): void {
     const sales = this.getSales()
     sales.unshift(sale)
     this.setItem("sales", sales)
-
-    // Update product quantities
-    sale.items.forEach((item) => {
-      this.updateProductQuantity(item.productId, item.quantity)
-    })
     
+    // En línea, intentamos sincronizar inmediatamente contra la API,
+    // pero el stock real solo se descuenta en el backend (MongoDB).
     this._syncItem("/api/ventas", sale).then((synced) => {
       if (synced) {
         this.markSalesAsSynced([sale.id])

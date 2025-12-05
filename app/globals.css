@@ -9,7 +9,7 @@
   --background: oklch(0.98 0.02 145); /* Slight green tint */
   --foreground: oklch(0.15 0.02 145);
   
-  --card: oklch(0.99 0.01 145); /* Very slight green tint for cards */
+  --card: oklch(95.688% 0.07549 145.023); /* Very slight green tint for cards */
   --card-foreground: oklch(0.15 0.02 145);
   
   --popover: oklch(1 0 0);
@@ -56,7 +56,7 @@
   --background: oklch(0.1 0.05 142); /* Deep dark green */
   --foreground: oklch(0.95 0.02 145);
   
-  --card: oklch(0.12 0.06 142); /* Slightly lighter dark green */
+  --card: oklch(18.112% 0.06163 142.511); /* Slightly lighter dark green */
   --card-foreground: oklch(0.95 0.02 145);
   
   --popover: oklch(0.12 0.06 142);

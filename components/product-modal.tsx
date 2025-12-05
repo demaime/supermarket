@@ -10,15 +10,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FiX, FiSave } from "react-icons/fi"
+import { FiX, FiSave, FiLoader } from "react-icons/fi"
 
 interface ProductModalProps {
   product: Product | null
   onClose: () => void
   onSave: (product: Product) => void
+  isSaving?: boolean
 }
 
-export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
+export function ProductModal({ product, onClose, onSave, isSaving = false }: ProductModalProps) {
   const [formData, setFormData] = useState<Partial<Product>>(() => {
     if (product) {
       return {
@@ -28,6 +29,7 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
         cost: product.cost,
         price: product.price,
         quantity: product.quantity,
+        lowStockThreshold: product.lowStockThreshold || 10,
         beneficiary: product.beneficiary,
         barcode: product.barcode || "",
       }
@@ -39,6 +41,7 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
       cost: 0,
       price: 0,
       quantity: 0,
+      lowStockThreshold: 10,
       beneficiary: "shared",
       barcode: "",
     }
@@ -54,6 +57,7 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
         cost: product.cost,
         price: product.price,
         quantity: product.quantity,
+        lowStockThreshold: product.lowStockThreshold || 10,
         beneficiary: product.beneficiary,
         barcode: product.barcode || "",
       })
@@ -65,6 +69,7 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
         cost: 0,
         price: 0,
         quantity: 0,
+        lowStockThreshold: 10,
         beneficiary: "shared",
         barcode: "",
       })
@@ -73,7 +78,7 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({
+    const productToSave = {
       id: product?.id || "",
       name: formData.name || "",
       description: formData.description || "",
@@ -81,11 +86,14 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
       cost: Number(formData.cost) || 0,
       price: Number(formData.price) || 0,
       quantity: Number(formData.quantity) || 0,
+      lowStockThreshold: Number(formData.lowStockThreshold) || 10,
       beneficiary: formData.beneficiary as "juan" | "lucas" | "shared",
       barcode: formData.barcode,
       createdAt: product?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    })
+    }
+    console.log('🔵 Modal enviando producto:', productToSave.name, 'lowStockThreshold:', productToSave.lowStockThreshold)
+    onSave(productToSave)
   }
 
   const profit = (Number(formData.price) || 0) - (Number(formData.cost) || 0)
@@ -95,15 +103,13 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/50 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto"
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         className="bg-card rounded-xl p-6 w-full max-w-lg shadow-2xl my-8"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">{product ? "Editar Producto" : "Nuevo Producto"}</h2>
@@ -183,7 +189,7 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
             </div>
 
             <div>
-              <Label htmlFor="quantity">Cantidad</Label>
+              <Label htmlFor="quantity">Cantidad inicial</Label>
               <Input
                 id="quantity"
                 type="number"
@@ -195,6 +201,23 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
             </div>
 
             <div>
+              <Label htmlFor="lowStockThreshold">
+                Stock mínimo
+                <span className="text-xs text-muted-foreground ml-1">(alerta)</span>
+              </Label>
+              <Input
+                id="lowStockThreshold"
+                type="number"
+                min="1"
+                value={formData.lowStockThreshold}
+                onChange={(e) =>
+                  setFormData({ ...formData, lowStockThreshold: Number.parseInt(e.target.value) || 10 })
+                }
+                placeholder="10"
+              />
+            </div>
+
+            <div className="col-span-2">
               <Label htmlFor="beneficiary">Beneficiario</Label>
               <Select
                 value={formData.beneficiary}
@@ -223,12 +246,16 @@ export function ProductModal({ product, onClose, onSave }: ProductModalProps) {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="outline" className="flex-1 bg-transparent" onClick={onClose}>
+            <Button type="button" variant="outline" className="flex-1 bg-transparent" onClick={onClose} disabled={isSaving}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 gap-2">
-              <FiSave className="h-4 w-4" />
-              {product ? "Guardar cambios" : "Crear producto"}
+            <Button type="submit" className="flex-1 gap-2" disabled={isSaving}>
+              {isSaving ? (
+                <FiLoader className="h-4 w-4 animate-spin" />
+              ) : (
+                <FiSave className="h-4 w-4" />
+              )}
+              {isSaving ? "Guardando..." : product ? "Guardar cambios" : "Crear producto"}
             </Button>
           </div>
         </form>

@@ -16,18 +16,20 @@ export async function POST(request: Request) {
   try {
     await dbConnect()
     const body = await request.json()
-    
-    // If closing a shift (body has endTime), update it
+
+    // Si llega un turno con endTime, asumimos que es un cierre de turno.
     if (body.endTime) {
-      const shift = await Shift.findOneAndUpdate(
-        { id: body.id },
-        body,
-        { new: true }
-      )
+      const shift = await Shift.findOneAndUpdate({ id: body.id }, body, { new: true })
       return NextResponse.json(shift)
     }
-    
-    // Otherwise create new shift
+
+    // Para inicio de turno, si ya existe un turno con ese id no lo volvemos a crear.
+    // Esto ayuda a evitar duplicados cuando el front reintenta en modo offline/online.
+    const existingShift = await Shift.findOne({ id: body.id })
+    if (existingShift) {
+      return NextResponse.json(existingShift)
+    }
+
     const shift = await Shift.create(body)
     return NextResponse.json(shift)
   } catch (error) {

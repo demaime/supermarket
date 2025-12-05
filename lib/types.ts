@@ -13,6 +13,7 @@ export interface Product {
   cost: number
   price: number
   quantity: number
+  lowStockThreshold: number // Umbral personalizado para alerta de stock bajo
   beneficiary: "juan" | "lucas" | "shared"
   barcode?: string
   createdAt: string
@@ -29,6 +30,12 @@ export interface SaleItem {
 
 export interface Sale {
   id: string
+  /**
+   * Origen de la venta:
+   * - "online": creada y enviada con conexión
+   * - "offline": creada sin conexión y luego sincronizada
+   */
+  origin?: "online" | "offline"
   items: SaleItem[]
   total: number
   userId: string

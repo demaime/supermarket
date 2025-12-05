@@ -7,7 +7,7 @@ import type { User, Shift } from "@/lib/types"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FiShoppingCart, FiPackage, FiClock, FiLogOut, FiSun, FiMoon, FiFileText } from "react-icons/fi"
+import { FiShoppingCart, FiPackage, FiClock, FiLogOut, FiSun, FiMoon, FiFileText, FiShield } from "react-icons/fi"
 import { useTheme } from "next-themes"
 import Image from "next/image"
 
@@ -16,6 +16,7 @@ const menuItems = [
   { id: "stock", name: "Stock", icon: FiPackage, href: "/stock", color: "bg-chart-2" },
   { id: "turnos", name: "Turnos", icon: FiClock, href: "/turnos", color: "bg-chart-4" },
   { id: "registros", name: "Registros", icon: FiFileText, href: "/registros", color: "bg-chart-3" },
+  { id: "auditoria", name: "Auditoría", icon: FiShield, href: "/stock-logs", color: "bg-chart-5" },
 ]
 
 export default function DashboardPage() {
@@ -49,8 +50,14 @@ export default function DashboardPage() {
       <header className="bg-card border-b p-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">A</span>
+            <div className="w-10 h-10 rounded-lg overflow-hidden">
+              <Image
+                src="/icon-512.png"
+                alt="Logo"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <span className="font-semibold text-lg block">Almacén</span>
@@ -101,29 +108,40 @@ export default function DashboardPage() {
             transition={{ delay: 0.1 }}
             className="mb-8"
           >
-            <Card className="bg-primary/10 border-primary/20">
-              <CardContent className="p-4">
-                <div className="flex flex-wrap gap-6">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ventas del turno</p>
-                    <p className="text-2xl font-bold">${shift.totalSales.toLocaleString("es-AR")}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ganancia</p>
-                    <p className="text-2xl font-bold text-primary">${shift.totalProfit.toLocaleString("es-AR")}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Transacciones</p>
-                    <p className="text-2xl font-bold">{shift.sales.length}</p>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 shadow-lg shadow-primary/5">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
+              <div className="relative grid grid-cols-3 divide-x divide-primary/10">
+                <div className="p-6 backdrop-blur-sm">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
+                    Ventas del turno
+                  </p>
+                  <p className="text-3xl font-bold text-foreground tracking-tight">${shift.totalSales.toLocaleString("es-AR")}</p>
+                </div>
+                <div className="p-6 backdrop-blur-sm bg-primary/5 relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent"></div>
+                  <div className="relative">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                      Ganancia
+                    </p>
+                    <p className="text-3xl font-bold text-primary tracking-tight drop-shadow-sm">${shift.totalProfit.toLocaleString("es-AR")}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="p-6 backdrop-blur-sm">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
+                    Transacciones
+                  </p>
+                  <p className="text-3xl font-bold text-foreground tracking-tight">{shift.sales.length}</p>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
 
         {/* Menu Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {menuItems.map((item, index) => (
             <motion.div
               key={item.id}
@@ -136,10 +154,10 @@ export default function DashboardPage() {
                 onClick={() => router.push(item.href)}
               >
                 <CardContent className="p-6 flex flex-col items-center text-center">
-                  <div
-                    className={`w-16 h-16 rounded-2xl ${item.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}
-                  >
-                    <item.icon className="h-8 w-8 text-primary-foreground" />
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/80 via-primary to-primary/90 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-primary/30">
+                    {/* Shine effect overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent rounded-2xl"></div>
+                    <item.icon className="h-8 w-8 text-white relative z-10 drop-shadow-md" />
                   </div>
                   <h3 className="text-xl font-semibold">{item.name}</h3>
                 </CardContent>

@@ -195,39 +195,51 @@ Venta #${index + 1} - ${new Date(sale.createdAt).toLocaleTimeString("es-AR")}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-muted rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <FiDollarSign className="h-4 w-4" />
-                      <span className="text-xs">Ventas</span>
+                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 shadow-md p-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
+                    <div className="relative">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <FiDollarSign className="h-4 w-4" />
+                        <span className="text-xs uppercase tracking-wide font-medium">Ventas</span>
+                      </div>
+                      <p className="text-2xl font-bold">${activeShift.totalSales.toLocaleString("es-AR")}</p>
                     </div>
-                    <p className="text-2xl font-bold">${activeShift.totalSales.toLocaleString("es-AR")}</p>
                   </div>
-                  <div className="bg-muted rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <FiTrendingUp className="h-4 w-4" />
-                      <span className="text-xs">Ganancia</span>
+                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 shadow-md p-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
+                    <div className="relative">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <FiTrendingUp className="h-4 w-4" />
+                        <span className="text-xs uppercase tracking-wide font-medium">Ganancia</span>
+                      </div>
+                      <p className="text-2xl font-bold text-primary">
+                        ${activeShift.totalProfit.toLocaleString("es-AR")}
+                      </p>
                     </div>
-                    <p className="text-2xl font-bold text-primary">
-                      ${activeShift.totalProfit.toLocaleString("es-AR")}
-                    </p>
                   </div>
-                  <div className="bg-muted rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <span className="text-xs font-bold">J</span>
-                      <span className="text-xs">Juan</span>
+                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 shadow-md p-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
+                    <div className="relative">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <span className="text-xs font-bold">J</span>
+                        <span className="text-xs uppercase tracking-wide font-medium">Juan</span>
+                      </div>
+                      <p className="text-2xl font-bold">
+                        ${activeShift.profitByBeneficiary.juan.toLocaleString("es-AR")}
+                      </p>
                     </div>
-                    <p className="text-2xl font-bold">
-                      ${activeShift.profitByBeneficiary.juan.toLocaleString("es-AR")}
-                    </p>
                   </div>
-                  <div className="bg-muted rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <span className="text-xs font-bold">L</span>
-                      <span className="text-xs">Lucas</span>
+                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 shadow-md p-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
+                    <div className="relative">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <span className="text-xs font-bold">L</span>
+                        <span className="text-xs uppercase tracking-wide font-medium">Lucas</span>
+                      </div>
+                      <p className="text-2xl font-bold">
+                        ${activeShift.profitByBeneficiary.lucas.toLocaleString("es-AR")}
+                      </p>
                     </div>
-                    <p className="text-2xl font-bold">
-                      ${activeShift.profitByBeneficiary.lucas.toLocaleString("es-AR")}
-                    </p>
                   </div>
                 </div>
 

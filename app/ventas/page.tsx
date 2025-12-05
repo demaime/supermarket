@@ -21,6 +21,7 @@ import {
   FiCheck,
 } from "react-icons/fi"
 import { toast } from "sonner"
+import { Loader } from "@/components/ui/loader"
 
 export default function VentasPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -33,6 +34,7 @@ export default function VentasPage() {
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -44,7 +46,19 @@ export default function VentasPage() {
       return
     }
     setUser(currentUser)
-    setProducts(store.getProducts())
+    
+    // Load products from DB if not in localStorage
+    const loadProducts = async () => {
+      setIsLoading(true)
+      try {
+        const products = await store.loadProductsFromDb()
+        setProducts(products)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    loadProducts()
   }, [router])
 
   // Search filtering
@@ -97,7 +111,7 @@ export default function VentasPage() {
         if (showConfirmModal) {
           e.preventDefault()
           handleConfirmSale()
-          setShowConfirmModal(false)
+          // setShowConfirmModal ya se llama dentro de handleConfirmSale
         } else if (showCancelModal) {
           e.preventDefault()
           handleCancelSale()
@@ -192,8 +206,12 @@ export default function VentasPage() {
   const handleConfirmSale = () => {
     if (!user || cart.length === 0) return
 
+    // Prevenir doble ejecución (Enter + Click)
+    setShowConfirmModal(false)
+
     const sale: Sale = {
       id: crypto.randomUUID(),
+      origin: navigator.onLine ? "online" : "offline",
       items: cart,
       total,
       userId: user.id,
@@ -204,7 +222,9 @@ export default function VentasPage() {
 
     store.addSale(sale)
     store.addSaleToShift(sale)
-    setProducts(store.getProducts()) // Refresh products
+    // El stock visible se actualizará cuando se sincronice con la DB
+    // y se vuelvan a cargar los productos.
+    // No tocamos el stock local para evitar doble descuento.
     setCart([])
     toast.success(`Venta confirmada: $${total.toLocaleString("es-AR")}`)
   }
@@ -246,7 +266,13 @@ export default function VentasPage() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Cart */}
+        {isLoading ? (
+          <div className="col-span-1 lg:col-span-3">
+            <Loader />
+          </div>
+        ) : (
+          <>
+            {/* Cart */}
         <div className="lg:col-span-2 space-y-4">
           {/* Search Button */}
           <Button
@@ -327,16 +353,20 @@ export default function VentasPage() {
 
         {/* Summary */}
         <div className="space-y-4">
-          <Card className="bg-primary text-primary-foreground">
-            <CardContent className="p-6">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/80 via-primary to-primary/90 shadow-2xl shadow-primary/30">
+            {/* Shine effect overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent"></div>
+            <div className="relative p-6 text-primary-foreground">
               <div className="flex items-center gap-3 mb-4">
-                <FiDollarSign className="h-8 w-8" />
-                <span className="text-lg opacity-90">Total a cobrar</span>
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <FiDollarSign className="h-6 w-6" />
+                </div>
+                <span className="text-lg font-medium opacity-90">Total a cobrar</span>
               </div>
-              <p className="text-5xl font-bold">${total.toLocaleString("es-AR")}</p>
+              <p className="text-5xl font-bold tracking-tight drop-shadow-lg">${total.toLocaleString("es-AR")}</p>
               <p className="text-sm opacity-75 mt-2">{cart.length} item(s)</p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           <Button className="w-full h-14 text-lg gap-2" disabled={cart.length === 0} onClick={() => setShowConfirmModal(true)}>
             <FiCheck className="h-5 w-5" />
@@ -383,6 +413,8 @@ export default function VentasPage() {
             </CardContent>
           </Card>
         </div>
+          </>
+        )}
       </main>
 
       {/* Search Modal */}
@@ -507,10 +539,7 @@ export default function VentasPage() {
                   </Button>
                   <Button
                     className="flex-1"
-                    onClick={() => {
-                      handleConfirmSale()
-                      setShowConfirmModal(false)
-                    }}
+                    onClick={handleConfirmSale}
                   >
                     Confirmar
                     <Badge variant="secondary" className="ml-2">Enter</Badge>

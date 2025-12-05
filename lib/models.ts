@@ -10,6 +10,7 @@ const ProductSchema = new Schema(
     cost: { type: Number, required: true },
     price: { type: Number, required: true },
     quantity: { type: Number, required: true },
+    lowStockThreshold: { type: Number, default: 10 }, // Umbral personalizado para alerta de stock bajo
     beneficiary: { type: String, enum: ["juan", "lucas", "shared"], required: true },
     barcode: { type: String },
   },
@@ -27,7 +28,14 @@ const SaleItemSchema = new Schema({
 
 const SaleSchema = new Schema(
   {
+    // Este id viene del frontend (UUID) y lo usamos como clave única
+    // para poder deduplicar ventas (especialmente en modo offline).
     id: { type: String, required: true, unique: true },
+    origin: {
+      type: String,
+      enum: ["online", "offline"],
+      default: "online",
+    },
     items: [SaleItemSchema],
     total: { type: Number, required: true },
     userId: { type: String, required: true },

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { FiX, FiPlus, FiMinus, FiPackage } from "react-icons/fi"
+import { useAlertDialog } from "@/hooks/use-alert-dialog"
 
 interface QuickStockModalProps {
   product: Product
@@ -16,13 +17,19 @@ interface QuickStockModalProps {
 
 export function QuickStockModal({ product, onClose, onSave }: QuickStockModalProps) {
   const [quantityToAdd, setQuantityToAdd] = useState<number>(0)
+  const { alert, Dialog: AlertDialog } = useAlertDialog()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (quantityToAdd !== 0) {
       const newQuantity = product.quantity + quantityToAdd
       if (newQuantity < 0) {
-        alert("No podés tener stock negativo")
+        await alert({
+          title: "Stock Negativo",
+          description: "No podés tener stock negativo. Por favor, ajustá la cantidad.",
+          type: "warning",
+          buttonText: "Entendido",
+        })
         return
       }
       onSave({ ...product, quantity: newQuantity }, quantityToAdd)
@@ -38,15 +45,13 @@ export function QuickStockModal({ product, onClose, onSave }: QuickStockModalPro
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/50 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         className="bg-card rounded-xl p-6 w-full max-w-md shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -156,6 +161,7 @@ export function QuickStockModal({ product, onClose, onSave }: QuickStockModalPro
           </div>
         </form>
       </motion.div>
+      <AlertDialog />
     </motion.div>
   )
 }

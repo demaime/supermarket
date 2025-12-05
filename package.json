@@ -7,7 +7,11 @@
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "clean-duplicates": "node scripts/clean-duplicates.js",
+    "validate": "node scripts/validate-architecture.js",
+    "check-db": "node scripts/check-db.js",
+    "create-indexes": "node scripts/create-indexes.js"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
